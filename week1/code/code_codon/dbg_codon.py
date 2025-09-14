@@ -1,6 +1,8 @@
 import copy
-from matplotlib import pyplot as plt
-
+try:
+    import matplotlib.pyplot as plt  # available in Python, not in Codon runner
+except Exception:
+    plt = None
 
 def reverse_complement(key):
     complement = {'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G'}

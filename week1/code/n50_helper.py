@@ -1,4 +1,5 @@
-import sys, re
+import sys
+import re
 
 lengths = []
 
@@ -6,13 +7,11 @@ for line in sys.stdin:
     line = line.strip()
     if not line:
         continue
-    # Strict: only lines "index length"
-    m = re.match(r'^(\d+)\s+(\d+)$', line)
+    m = re.match(r'^(\d+)\s+(\d+)$', line)  # "index length"
     if m:
         lengths.append(int(m.group(2)))
         continue
-    # Or accept a bare integer line (one number only)
-    if re.match(r'^\d+$', line):
+    if re.match(r'^\d+$', line):            # bare length
         lengths.append(int(line))
 
 if not lengths:
