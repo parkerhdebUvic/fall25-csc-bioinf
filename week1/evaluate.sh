@@ -1,64 +1,79 @@
 #!/usr/bin/env bash
-set -euxo pipefail
+# quiet, print-only evaluator
+# (Try to raise stack size; needed for data4 on Linux. macOS may refuse—ignore.)
+ulimit -s 8192000 || true
+set -euo pipefail
 
 PY="python3"
 CODE_PY="week1/code/code_python/main.py"
-CODE_CODON="week1/code/code_codon/main_codon.py"
+CODE_CODON="week1/code/code_codon/main.py"
+
 DATA_DIR="week1/data"
-OUT_DIR="week1/test"
 N50_HELPER="week1/code/n50_helper.py"
 
-mkdir -p "${OUT_DIR}"
+# Allow quick tests: DATASETS="data1" bash week1/evaluate.sh
+DATASETS="${DATASETS:-data1 data2 data3 data4}"
+
+CODON_BIN="${CODON_BIN:-codon}"
+command -v "$CODON_BIN" >/dev/null 2>&1 || CODON_BIN="$HOME/.codon/bin/codon"
 
 fmt_hms () { local S=$1; printf "%d:%02d:%02d" $((S/3600)) $(((S%3600)/60)) $((S%60)); }
 
-run_and_time () {
-  local outfile="$1"; shift
-  local start end
-  start=$(date +%s)
-  "$@" > "${outfile}"
-  end=$(date +%s)
-  echo $((end - start))
-}
+echo -e "Dataset\tLanguage \tRuntime \tN50"
+echo "-------------------------------------------------------------------------------------------------------"
 
-echo -e "Dataset\tLanguage\tRuntime\tN50"
-echo "----------------------------------------------"
-
-for d in data1 data2 data3 data4; do
+for d in $DATASETS; do
   ds="${DATA_DIR}/${d}"
   [[ -d "${ds}" ]] || { echo "⚠️  Skipping ${d}: ${ds} not found" >&2; continue; }
 
-  # Python
-  py_out="${OUT_DIR}/${d}.python.out"
-  py_secs=$(run_and_time "${py_out}" "${PY}" "${CODE_PY}" "${ds}")
-  py_rt=$(fmt_hms "${py_secs}")
-  py_n50=$(grep -E '^[0-9]+\s+[0-9]+$|^[0-9]+$' "${py_out}" | ${PY} "${N50_HELPER}")
-  echo -e "${d}\tpython\t${py_rt}\t${py_n50}"
-
-  # Codon
-  co_out="${OUT_DIR}/${d}.codon.out"
-  set +e
-  co_secs=$(run_and_time "${co_out}" codon run -release -plugin seq "${CODE_CODON}" "${ds}")
-  codon_rc=$?
-  set -e
-  if [[ ${codon_rc} -ne 0 ]]; then
-    echo -e "${d}\tcodon\tERROR\tNA"
+  # require FASTAs
+  req=(short_1.fasta short_2.fasta long.fasta)
+  have_all=1
+  for f in "${req[@]}"; do
+    [[ -f "${ds}/${f}" ]] || { have_all=0; break; }
+  done
+  if [[ $have_all -eq 0 ]]; then
+    echo "⚠️  Skipping ${d}: missing FASTA(s) in ${ds}" >&2
     continue
   fi
-  co_rt=$(fmt_hms "${co_secs}")
-  co_n50=$(grep -E '^[0-9]+\s+[0-9]+$|^[0-9]+$' "${co_out}" | ${PY} "${N50_HELPER}")
-  echo -e "${d}\tcodon\t${co_rt}\t${co_n50}"
 
-  # Compare outputs (exact or N50)
-  set +e
-  diff -q "${py_out}" "${co_out}" >/dev/null
-  same_out=$?
-  set -e
-  if [[ ${same_out} -ne 0 ]]; then
-    if [[ "${py_n50}" != "${co_n50}" ]]; then
-      echo "⚠️  ${d}: Python vs Codon outputs differ AND N50 differ (${py_n50} vs ${co_n50})." >&2
-    else
-      echo "ℹ️  ${d}: Outputs differ but N50 matches (${py_n50})." >&2
-    fi
+  # -------- Python (capture stdout inline) --------
+  start=$(date +%s)
+  py_out="$("${PY}" "${CODE_PY}" "${ds}")"
+  py_secs=$(( $(date +%s) - start ))
+  py_rt=$(fmt_hms "${py_secs}")
+
+  py_lines="$(printf "%s\n" "$py_out" | grep -E '^[0-9]+\s+[0-9]+$|^[0-9]+$' || true)"
+  if [[ -n "$py_lines" ]]; then
+    py_n50="$(printf "%s\n" "$py_lines" | ${PY} "${N50_HELPER}")"
+  else
+    py_n50=0
   fi
+  printf "%s\t%s\t\t%s\t\t%s\n" "${d}" "python" "${py_rt}" "${py_n50}"
+
+  # -------- Codon (cd into code_codon; capture inline) --------
+  start=$(date +%s)
+  if ! co_out="$(cd week1/code/code_codon && "$CODON_BIN" run -release -plugin seq "main.py" "../../data/${d}")"; then
+    printf "%s\t%s\t\t%s\t\t%s\n" "${d}" "codon" "ERROR" "NA"
+    continue
+  fi
+  co_secs=$(( $(date +%s) - start ))
+  co_rt=$(fmt_hms "${co_secs}")
+
+  co_lines="$(printf "%s\n" "$co_out" | grep -E '^[0-9]+\s+[0-9]+$|^[0-9]+$' || true)"
+  if [[ -n "$co_lines" ]]; then
+    co_n50="$(printf "%s\n" "$co_lines" | ${PY} "${N50_HELPER}")"
+  else
+    co_n50=0
+  fi
+  printf "%s\t%s\t\t%s\t\t%s\n" "${d}" "codon" "${co_rt}" "${co_n50}"
+
+  # Optional: warn if outputs differ (but N50 matches)
+  # if [[ "$py_out" != "$co_out" ]]; then
+  #   if [[ "$py_n50" != "$co_n50" ]]; then
+  #     echo "⚠️  ${d}: Python vs Codon outputs differ AND N50 differ (${py_n50} vs ${co_n50})." >&2
+  #   else
+  #     echo "ℹ️  ${d}: Outputs differ but N50 matches (${py_n50})." >&2
+  #   fi
+  # fi
 done

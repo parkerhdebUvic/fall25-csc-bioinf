@@ -1,0 +1,20 @@
+# AI Usage (Week 1)
+
+Models / versions
+- ChatGPT (GPT-5 Thinking), used between 2025-09-13 and 2025-09-14.
+
+Prompts / tasks
+- “Convert this Python assembler to Codon; keep behavior identical; avoid pathlib/os.path; remove matplotlib.”
+- “Write evaluate.sh that runs python + codon, times them, computes N50, outputs a table.”
+- “Help compute N50 from stdout.”
+
+Key instructions applied
+- Avoid non-portable stdlib in Codon (pathlib, os.path, sys.path hacks).
+- Remove matplotlib from Codon copy.
+- Add deterministic N50 parsing (ignore header lines).
+- Accept that contig lists may differ; compare via N50.
+
+Files influenced
+- `week1/code/code_codon/*` (Codon ports)
+- `week1/evaluate.sh`
+- `week1/code/n50_helper.py`
