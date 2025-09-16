@@ -1,20 +1,118 @@
-# AI Usage (Week 1)
+AI USAGE SUMMARY (ai.txt)
 
-Models / versions
-- ChatGPT (GPT-5 Thinking), used between 2025-09-13 and 2025-09-14.
+Student: Parker De Bruyne
+Course: CSC Bioinformatics (Fall ’25)
+Repo: parkerhdebUVic/fall25-csc-bioinf
+Week: 1
 
-Prompts / tasks
-- “Convert this Python assembler to Codon; keep behavior identical; avoid pathlib/os.path; remove matplotlib.”
-- “Write evaluate.sh that runs python + codon, times them, computes N50, outputs a table.”
-- “Help compute N50 from stdout.”
+## WHAT THIS FILE IS
 
-Key instructions applied
-- Avoid non-portable stdlib in Codon (pathlib, os.path, sys.path hacks).
-- Remove matplotlib from Codon copy.
-- Add deterministic N50 parsing (ignore header lines).
-- Accept that contig lists may differ; compare via N50.
+A short record of how I used an LLM (ChatGPT) to help with this assignment.
+Includes the kinds of prompts I gave, what the assistant produced, and the tooling/versions referenced.
 
-Files influenced
-- `week1/code/code_codon/*` (Codon ports)
-- `week1/evaluate.sh`
-- `week1/code/n50_helper.py`
+## ASSISTANT / MODEL
+
+Assistant: ChatGPT (OpenAI), model reported as “GPT-5 Thinking”.
+Interface: ChatGPT web UI.
+Human-in-the-loop: I reviewed, edited, ran, and debugged all suggested code before committing.
+
+## TOOLS / VERSIONS REFERENCED IN PROMPTS
+
+Python: 3.13 in CI (via actions/setup-python@v6), 3.11+ locally.
+Codon: v0.19.3 (Linux x86_64 tarball).
+Codon seq plugin: v0.11.5.
+GitHub Actions runner: ubuntu-latest; actions/checkout@v5.
+find_libpython (PyPI) to set CODON_PYTHON for Codon’s Python bridge.
+Optional bonus: BLAST+ (blastn) via Homebrew/Conda (version not pinned).
+macOS environment notes: iCloud Drive settings discussed for avoiding file offloading during long runs.
+
+## CATEGORIES OF PROMPTS I USED
+
+Repo + Git/CI setup
+Examples: “Why did git push get rejected and how do I reconcile origin/main?”, “Write a minimal GitHub Actions YAML that installs Codon + seq, sets up Python, and runs my script.”
+Outcomes: A working actions.yml that installs Codon/seq, sets up Python 3.13, exports CODON_PYTHON, and runs week1/evaluate.sh.
+Shell automation (evaluate.sh)
+Examples: “Write a Bash script that loops over data1..data4, runs both Python and Codon, times them, computes N50, and prints a table.”
+
+Outcomes: evaluate.sh that:
+• runs both implementations,
+• captures stdout inline,
+• extracts lengths for N50,
+• computes N50 via a helper,
+• prints a concise table,
+• optionally raises stack size on Linux (ulimit),
+• allows DATASETS="..." overrides.
+
+Python → Codon conversion
+
+Examples: “Make the code Codon-friendly,” “I’m hitting ‘no module named matplotlib’,” “I’m getting NoneType hashing/type errors.”
+
+Outcomes:
+• Removed matplotlib usage.
+• Avoided file/pathlib reliance; used argv[0] and simple joins.
+• Guarded sys.setrecursionlimit (Codon may not expose it).
+• Adjusted data structures to avoid NoneType hashing and type-generalization issues in Codon (seeded set/dict types and used -1 instead of None for child indices).
+• Fixed string formatting incompatibilities.
+
+Debugging runtime mismatches and errors
+
+Examples: “Python and Codon outputs differ slightly, but how do I compare via N50?”, “Why does data4 fail in Codon?”
+
+Outcomes:
+• Accepted minor contig ordering differences; focused on N50 parity.
+• Added ulimit guidance for deep recursion.
+• Discussed iterative DFS as a mitigation for deep recursion; final code uses type-seeding fixes plus stack guidance.
+
+## N50 helper design
+
+Examples: “Write a tiny helper that reads contig lengths and returns N50, tolerant to different line formats.”
+
+Outcomes: n50_helper.py that:
+• tolerates “index length” or bare integers,
+• filters non-digits safely,
+• sorts descending and finds the first length where cumulative ≥ 50% total.
+
+Bonus (BLAST) how-to and interpretation
+
+Examples: “How do I quickly BLAST contigs to identify the organism?”, “How do I interpret the NCBI web BLAST output?”
+
+Outcomes:
+• A small local helper (bonus_blast.sh) using blastn -remote to nt with a concise -outfmt.
+• Guidance on reading BLAST tables (Query cover, Identity, E-value, organism), noting strong hits for Porphyromonas gingivalis for data1.
+
+macOS/iCloud interference
+
+Examples: “iCloud is offloading my dataset files; how do I stop that?”
+
+Outcomes: Steps to disable Desktop/Documents sync or “Optimize Mac Storage” and to ensure local copies of large FASTA files persist during long runs.
+
+## HOW I USED THE ASSISTANT’S OUTPUT
+
+I treated code from the assistant as drafts/snippets, then:
+• Ran locally, inspected errors, and iterated.
+• Adjusted paths and environment to my repo layout.
+• Verified CI logs and refined scripts to be non-noisy and deterministic where possible.
+
+I preserved human oversight on all code added to the repository.
+
+## LIMITATIONS / NON-DETERMINISM NOTED
+
+Contig ordering can vary due to traversal tie-breaks; assignment emphasizes N50 instead of exact contig ordering.
+
+Deep recursion (data4) can trigger stack issues; ulimit and/or iterative traversal is recommended.
+
+BLAST results depend on NCBI database state and network; results may change slightly over time.
+
+## WHERE PROMPTS AND TOOL INFO ARE REFLECTED IN THE REPO
+
+week1/evaluate.sh (automation, timing, N50).
+
+week1/code/code_python/* and week1/code/code_codon/* (Codon-friendly changes).
+
+week1/code/n50_helper.py (tolerant N50).
+
+.github/workflows/actions.yml (CI setup).
+
+week1/bonus_blast.sh (optional local-only bonus helper).
+
+week1/report.md (pipeline, results, reproducibility notes, and a placeholder table for BLAST findings).
