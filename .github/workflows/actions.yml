@@ -27,6 +27,10 @@ jobs:
           # persist PATH for subsequent steps:
           echo "${HOME}/.codon/bin" >> "$GITHUB_PATH"
 
+      - name: Install matplotlib
+        run: |
+          pip install matplotlib
+
       - name: Set up Codon Python bridge
         run: |
           pip install --upgrade pip
@@ -38,6 +42,6 @@ jobs:
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
       - name: Week 1
-        run: bash week1/evaluate.sh
         env:
           CODON_PYTHON: ${{ env.CODON_PYTHON }}
+        run: bash week1/evaluate.sh #maybe this should be after env?
